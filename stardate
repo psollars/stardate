@@ -1,0 +1,80 @@
+#! /bin/zsh
+
+# take command line arguments for month range, default to 1..12
+if [ $# -eq 0 ]; then
+  START_MONTH=1
+  END_MONTH=12
+elif [ $# -eq 1 ]; then
+  START_MONTH=$1
+  END_MONTH=$1
+else
+  START_MONTH=$1
+  END_MONTH=$2
+fi
+
+# get the current year
+YEAR=$(date +"%Y")
+
+declare -A MONTHS=([1]="January" [2]="February" [3]="March" [4]="April" [5]="May" [6]="June" [7]="July" [8]="August" [9]="September" [10]="October" [11]="November" [12]="December")
+
+is_weekend() {
+  # check if a given date is a weekend
+  local day_of_week
+
+  day_of_week=$(date -jf "%F" "$1" +"%u") # 1=Monday, 7=Sunday
+  [ "$day_of_week" -gt 5 ]
+}
+
+get_previous_friday() {
+  # get the previous Friday for a given Monday
+  local date_to_check="$1"
+  local day_of_week
+
+  day_of_week=$(date -jf "%F" "$date_to_check" +"%u")
+  if [[ "$day_of_week" -eq 1 ]]; then
+    date -jf "%F" -v-3d "$date_to_check" +"%F"
+  else
+    echo "How did we get here? $date_to_check"
+  fi
+}
+
+generate_dates() {
+  local month="$1"
+  local current_date next_date
+
+  for day in $(seq -w 1 30); do
+    current_date=$(printf "%04d-%02d-%02d" "$YEAR" "$month" "$day")
+
+    if ! date -jf "%F" "$current_date" &>/dev/null; then
+      echo "Invalid date: $current_date"
+      break
+    fi
+
+    # skip weekends
+    if is_weekend "$current_date"; then
+      continue
+    fi
+
+    next_date=$(date -jf "%F" -v+1d "$current_date" +"%F")
+    while is_weekend "$next_date"; do
+      next_date=$(date -jf "%F" -v+1d "$next_date" +"%F")
+    done
+
+    if [[ $(date -jf "%F" "$next_date" +"%u") -eq 1 ]]; then
+      current_date=$(get_previous_friday "$next_date")
+    fi
+
+    echo "- \`$current_date\`"
+    echo "- \`$next_date\`"
+    echo ""
+    echo "---"
+    echo ""
+  done
+}
+
+for month in $(seq "$START_MONTH" "$END_MONTH"); do
+  echo "# ${MONTHS[$month]}"
+  echo ""
+
+  generate_dates "$month"
+done
